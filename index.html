@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Gateway - Verification Required</title>
+    <title>Security Gateway - Triple Verification</title>
     
     <!-- Load hCaptcha Integration Script -->
     <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
@@ -17,11 +17,11 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            margin: 0;
+            margin: 20px 0;
         }
         .gateway-box {
             background: #111827;
-            padding: 40px;
+            padding: 30px 40px;
             border-radius: 12px;
             border: 2px solid #1f2937;
             text-align: center;
@@ -32,8 +32,9 @@
         .captcha-wrapper {
             margin: 20px 0;
             display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
-            min-height: 80px;
         }
         .btn-proceed {
             background-color: #dc2626;
@@ -60,7 +61,41 @@
         }
         h1 { color: #f3f4f6; font-size: 24px; margin-bottom: 5px; letter-spacing: -0.5px; }
 
-        /* Hide the mCaptcha authorization token input field */
+        /* Canvas CAPTCHA Styles */
+        #matrixCanvas {
+            border: 1px dashed #374151;
+            background: #1f2937;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .matrix-input {
+            width: 80%;
+            padding: 8px;
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #fff;
+            font-size: 15px;
+            font-family: monospace;
+            border-radius: 4px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .matrix-input:focus {
+            outline: 1px solid #dc2626;
+        }
+        .matrix-btn {
+            background: #374151;
+            color: #e2e8f0;
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 11px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .matrix-btn:hover {
+            background: #4b5563;
+        }
         #mcaptcha__token-label {
             display: none;
         }
@@ -70,9 +105,16 @@
 
 <div class="gateway-box">
     <h1>SECURITY CLEARANCE</h1>
-    <p id="statusMsg" class="status-msg">Please complete both verification challenges below.</p>
+    <p id="statusMsg" class="status-msg">Please complete all 3 security challenges below.</p>
 
-    <!-- 1. mCaptcha Form Elements (Per Official Docs) -->
+    <!-- 1. Visual Canvas Math Challenge -->
+    <div class="captcha-wrapper">
+        <canvas id="matrixCanvas" width="280" height="80"></canvas>
+        <input type="text" id="captchaInput" class="matrix-input" placeholder="Solve math challenge" autocomplete="off">
+        <button type="button" class="matrix-btn" onclick="generateHardMatrix()">Regenerate Challenge</button>
+    </div>
+
+    <!-- 2. mCaptcha Challenge -->
     <div class="captcha-wrapper">
         <label 
             data-mcaptcha_url="https://demo.mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx" 
@@ -83,7 +125,7 @@
         <div id="mcaptcha__widget-container"></div>
     </div>
 
-    <!-- 2. hCaptcha Box -->
+    <!-- 3. hCaptcha Box -->
     <div class="captcha-wrapper">
         <div class="h-captcha" 
              data-sitekey="0434871e-cc70-4460-bbb4-00e6bc7204fa" 
@@ -91,18 +133,91 @@
         </div>
     </div>
 
-    <!-- Proceed Button -->
+    <!-- Entry Execution Link -->
     <button id="entryBtn" class="btn-proceed" onclick="forwardUser()">Access Approved: Enter Site</button>
 </div>
 
-<!-- Load mCaptcha Vanilla Glue Script at end of body -->
+<!-- Load mCaptcha Vanilla Glue Script -->
 <script src="https://unpkg.com/@mcaptcha/vanilla-glue@0.1.0-rc2/dist/index.js"></script>
 
 <script>
     let mcaptchaToken = "";
     let hcaptchaToken = "";
+    let canvasVerified = false;
+    let secureTargetValue = null;
 
-    // Monitor mCaptcha token generation automatically
+    // --- 1. Visual Canvas CAPTCHA Generator ---
+    function generateHardMatrix() {
+        const canvas = document.getElementById("matrixCanvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Background noise grid
+        for (let x = 0; x < canvas.width; x += 15) {
+            ctx.strokeStyle = `rgba(${Math.random()*100}, ${Math.random()*255}, ${Math.random()*100}, 0.25)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        
+        // Equation variables
+        const valA = Math.floor(Math.random() * 25) + 11; 
+        const valB = Math.floor(Math.random() * 9) + 2;   
+        secureTargetValue = valA + valB;
+        const challengeText = `${valA} + ${valB} = ?`;
+
+        // Interruption lines
+        for (let i = 0; i < 10; i++) {
+            ctx.strokeStyle = `rgb(${Math.floor(Math.random()*255)},${Math.floor(Math.random()*255)},${Math.floor(Math.random()*255)})`;
+            ctx.beginPath();
+            ctx.lineWidth = Math.random() * 2 + 1;
+            ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+            ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+            ctx.stroke();
+        }
+
+        // Render distorted glyphs
+        ctx.font = "bold 28px Courier New";
+        ctx.textBaseline = "middle";
+
+        let startX = 30;
+        for (let char of challengeText) {
+            ctx.save();
+            let randomY = 40 + (Math.random() * 12 - 6);
+            ctx.translate(startX, randomY);
+            let randomAngle = (Math.random() * 30 - 15) * Math.PI / 180;
+            ctx.rotate(randomAngle);
+            
+            ctx.fillStyle = `rgb(${Math.random()*100},${Math.random()*100},${Math.random()*255})`;
+            ctx.fillText(char, 2, 2);
+            
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(char, 0, 0);
+            ctx.restore();
+            startX += 24;
+        }
+
+        // Foreground noise dots
+        for (let i = 0; i < 120; i++) {
+            ctx.fillStyle = `rgb(${Math.random()*255},${Math.random()*255},${Math.random()*255})`;
+            ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 2, 2);
+        }
+
+        // Reset status on redraw
+        canvasVerified = false;
+        document.getElementById("captchaInput").value = "";
+        evaluateAccessRules();
+    }
+
+    // Input listener for Canvas CAPTCHA
+    document.getElementById("captchaInput").addEventListener("input", function(e) {
+        const userVal = parseInt(e.target.value.trim(), 10);
+        canvasVerified = (userVal === secureTargetValue);
+        evaluateAccessRules();
+    });
+
+    // --- 2. mCaptcha Token Monitor ---
     setInterval(() => {
         const tokenInput = document.getElementById("mcaptcha__token");
         if (tokenInput && tokenInput.value && !mcaptchaToken) {
@@ -111,34 +226,37 @@
         }
     }, 300);
 
-    // Callback fired when hCaptcha completes
+    // --- 3. hCaptcha Callback ---
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
-    // Evaluate token presence and reveal entry button
+    // --- 4. Central Evaluator ---
     function evaluateAccessRules() {
         const statusMsg = document.getElementById("statusMsg");
         const entryBtn = document.getElementById("entryBtn");
 
-        if (mcaptchaToken && !hcaptchaToken) {
-            statusMsg.innerText = "mCaptcha verified ✓. Please complete hCaptcha.";
-            statusMsg.style.color = "#3b82f6";
-        } else if (!mcaptchaToken && hcaptchaToken) {
-            statusMsg.innerText = "hCaptcha verified ✓. Please complete mCaptcha.";
-            statusMsg.style.color = "#3b82f6";
-        } else if (mcaptchaToken && hcaptchaToken) {
+        const completedCount = [canvasVerified, !!mcaptchaToken, !!hcaptchaToken].filter(Boolean).length;
+
+        if (completedCount === 3) {
             statusMsg.innerText = "All security challenges passed ✓";
             statusMsg.style.color = "#10b981";
             entryBtn.style.display = "block";
+        } else {
+            entryBtn.style.display = "none";
+            statusMsg.innerText = `Progress: ${completedCount}/3 challenges completed.`;
+            statusMsg.style.color = "#9ca3af";
         }
     }
 
     function forwardUser() {
         const targetUrl = "https://hindhokla-os.netlify.app/";
-        window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}`;
+        window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}&math_v=passed`;
     }
+
+    // Initialize Canvas on Load
+    window.onload = generateHardMatrix;
 </script>
 
 </body>
