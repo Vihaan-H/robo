@@ -3,8 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blank Page</title>
+    <title>Security Verification</title>
+    <!-- Load Captcha Scripts -->
+ <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+
+    <script src="https://cloudflare.com" async defer></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f5f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .verification-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        .captcha-box {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+        .btn {
+            background-color: #0070f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            display: none; /* Hidden until verified */
+            font-weight: bold;
+        }
+        .btn:hover { background-color: #0051cb; }
+        .status { color: #666; font-size: 14px; margin-bottom: 10px; }
+    </style>
 </head>
 <body>
+
+<div class="verification-container">
+    <h2>Verify You Are Human</h2>
+    <p class="status">Please complete both security checks to proceed.</p>
+
+    <!-- 1. Cloudflare Turnstile -->
+    <div class="captcha-box">
+        <div class="cf-turnstile" 
+             data-sitekey="YOUR_CLOUDFLARE_TURNSTILE_SITE_KEY" 
+             data-callback="onTurnstileSuccess">
+        </div>
+    </div>
+
+    <!-- 2. hCaptcha -->
+    <div class="captcha-box">
+        <div class="h-captcha" 
+             data-sitekey="0434871e-cc70-4460-bbb4-00e6bc7204fa" 
+             data-callback="onHCaptchaSuccess">
+        </div>
+    </div>
+
+    <!-- Forwarding Button -->
+    <button id="proceedBtn" class="btn" onclick="redirectToMainSite()">Continue to Website</button>
+</div>
+
+<script>
+    let turnstileVerified = false;
+    let hcaptchaVerified = false;
+
+    // Tokens received from successful validations
+    let turnstileToken = "";
+    let hcaptchaToken = "";
+
+    function onTurnstileSuccess(token) {
+        turnstileVerified = true;
+        turnstileToken = token;
+        checkVerificationStatus();
+    }
+
+    function onHCaptchaSuccess(token) {
+        hcaptchaVerified = true;
+        hcaptchaToken = token;
+        checkVerificationStatus();
+    }
+
+    function checkVerificationStatus() {
+        // If both are completed, show the proceed button
+        if (turnstileVerified && hcaptchaVerified) {
+            document.getElementById("proceedBtn").style.display = "block";
+            document.querySelector(".status").innerText = "Verification complete! Click below.";
+        }
+    }
+
+    function redirectToMainSite() {
+        // Replace with your actual target website URL
+        const targetWebsite = "
+hindhokla-os.netlify.app"; 
+        
+        // Optional: Pass the tokens to your main site via URL query parameters if your backend needs to double-check them
+        window.location.href = `${targetWebsite}?cf_token=${turnstileToken}&h_token=${hcaptchaToken}`;
+    }
+</script>
+
 </body>
 </html>
+`
