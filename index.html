@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Gateway - Verification Required</title>
     
-    <!-- Load hCaptcha Integration Script -->
+    <!-- Load hCaptcha Script -->
     <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
     
     <!-- Load mCaptcha Vanilla Glue Script -->
-    <script src="https://unpkg.com/@mcaptcha/vanilla-glue@latest/dist/index.js" defer></script>
+    <script src="https://unpkg.com/@mcaptcha/vanilla-glue@latest/dist/index.js"></script>
 
     <style>
         body {
@@ -64,8 +64,10 @@
     <h1>SECURITY CLEARANCE</h1>
     <p class="status-msg">Compute verification and manual verification required to pass.</p>
 
-    <!-- 1. mCaptcha Box (Container for auto-injection) -->
-    <div class="captcha-wrapper" id="mcaptcha-container"></div>
+    <!-- 1. mCaptcha Box (Container required by mCaptcha) -->
+    <div class="captcha-wrapper">
+        <div id="mcaptcha__widget-container"></div>
+    </div>
 
     <!-- 2. hCaptcha Box -->
     <div class="captcha-wrapper">
@@ -83,32 +85,42 @@
     let mcaptchaToken = "";
     let hcaptchaToken = "";
 
-    // Initialize mCaptcha via standard JS Glue on page load
-    window.addEventListener('DOMContentLoaded', () => {
-        if (window.mcaptchaGlue && window.mcaptchaGlue.default) {
-            const config = {
-                widgetLink: new URL("https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx")
-            };
-            new window.mcaptchaGlue.default(config);
+    // Function to safely initialize mCaptcha once the library is loaded
+    function initMCaptcha() {
+        if (typeof mcaptchaGlue !== 'undefined') {
+            try {
+                new mcaptchaGlue.Widget({
+                    widgetLink: new URL("https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx")
+                });
+            } catch (err) {
+                console.error("mCaptcha initialization failed:", err);
+            }
+        } else {
+            // Retry after 100ms if script is still downloading
+            setTimeout(initMCaptcha, 100);
         }
+    }
 
-        // Poll for mCaptcha completion token injected into #mcaptcha__token
+    // Start initialization when page loads
+    window.addEventListener('load', () => {
+        initMCaptcha();
+
+        // Check continuously for the token input created by mCaptcha
         setInterval(() => {
             const tokenInput = document.getElementById("mcaptcha__token");
             if (tokenInput && tokenInput.value && !mcaptchaToken) {
                 mcaptchaToken = tokenInput.value;
                 evaluateAccessRules();
             }
-        }, 500);
+        }, 300);
     });
 
-    // Event callback for hCaptcha visual verification
+    // Callback for hCaptcha completion
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
-    // Verify both tokens exist before displaying proceed button
     function evaluateAccessRules() {
         if (mcaptchaToken && hcaptchaToken) {
             const entryBtn = document.getElementById("entryBtn");
