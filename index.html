@@ -8,9 +8,9 @@
     <!-- Load hCaptcha Integration Script -->
     <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
     
-    <!-- Load mCaptcha Integration Script -->
+    <!-- Load mCaptcha Vanilla Glue Script -->
     <script src="https://unpkg.com/@mcaptcha/vanilla-glue@latest/dist/index.js" defer></script>
-    
+
     <style>
         body {
             font-family: monospace;
@@ -46,7 +46,7 @@
             border-radius: 6px;
             cursor: pointer;
             width: 100%;
-            display: none; /* Hidden until verification constraints pass */
+            display: none;
             font-weight: bold;
             letter-spacing: 1px;
             text-transform: uppercase;
@@ -64,14 +64,8 @@
     <h1>SECURITY CLEARANCE</h1>
     <p class="status-msg">Compute verification and manual verification required to pass.</p>
 
-    <!-- 1. mCaptcha Box -->
-    <div class="captcha-wrapper">
-        <mcaptcha-widget 
-            id="mcaptcha-widget" 
-            site-key="tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx" 
-            instance-url="https://mcaptcha.org">
-        </mcaptcha-widget>
-    </div>
+    <!-- 1. mCaptcha Box (Container for auto-injection) -->
+    <div class="captcha-wrapper" id="mcaptcha-container"></div>
 
     <!-- 2. hCaptcha Box -->
     <div class="captcha-wrapper">
@@ -89,37 +83,47 @@
     let mcaptchaToken = "";
     let hcaptchaToken = "";
 
-    // Event hooks to watch mCaptcha computational loop status
+    // Initialize mCaptcha via standard JS Glue on page load
     window.addEventListener('DOMContentLoaded', () => {
-        const widget = document.getElementById('mcaptcha-widget');
-        if (widget) {
-            widget.addEventListener('mcaptcha-success', (e) => {
-                mcaptchaToken = e.detail ? e.detail.token : e.token;
-                evaluateAccessRules();
-            });
+        if (window.mcaptchaGlue && window.mcaptchaGlue.default) {
+            const config = {
+                widgetLink: new URL("https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx")
+            };
+            new window.mcaptchaGlue.default(config);
         }
+
+        // Poll for mCaptcha completion token injected into #mcaptcha__token
+        setInterval(() => {
+            const tokenInput = document.getElementById("mcaptcha__token");
+            if (tokenInput && tokenInput.value && !mcaptchaToken) {
+                mcaptchaToken = tokenInput.value;
+                evaluateAccessRules();
+            }
+        }, 500);
     });
 
-    // Event hooks to watch hCaptcha visual completion status
+    // Event callback for hCaptcha visual verification
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
+    // Verify both tokens exist before displaying proceed button
     function evaluateAccessRules() {
-        // Proceed button remains invisible unless BOTH tokens are provided
         if (mcaptchaToken && hcaptchaToken) {
-            document.getElementById("entryBtn").style.display = "block";
-            document.querySelector(".status-msg").innerText = "All security challenges passed.";
-            document.querySelector(".status-msg").style.color = "#10b981";
+            const entryBtn = document.getElementById("entryBtn");
+            const statusMsg = document.querySelector(".status-msg");
+            
+            if (entryBtn) entryBtn.style.display = "block";
+            if (statusMsg) {
+                statusMsg.innerText = "All security challenges passed.";
+                statusMsg.style.color = "#10b981";
+            }
         }
     }
 
     function forwardUser() {
-        // Updated redirect target URL
         const targetUrl = "https://hindhokla-os.netlify.app/";
-        
-        // Passing data downstream to your main landing site
         window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}`;
     }
 </script>
