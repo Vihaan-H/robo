@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Gateway - Triple Verification</title>
+    <title>Security Gateway - Quadruple Verification</title>
     
     <!-- Load hCaptcha Integration Script -->
     <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+
+    <!-- Load Friendly Captcha Scripts -->
+    <script type="module" src="https://unpkg.com/friendly-challenge@0.9.8/widget.module.min.js" async defer></script>
+    <script nomodule src="https://unpkg.com/friendly-challenge@0.9.8/widget.min.js" async defer></script>
 
     <style>
         body {
@@ -105,7 +109,7 @@
 
 <div class="gateway-box">
     <h1>SECURITY CLEARANCE</h1>
-    <p id="statusMsg" class="status-msg">Please complete all 3 security challenges below.</p>
+    <p id="statusMsg" class="status-msg">Please complete all 4 security challenges below.</p>
 
     <!-- 1. Visual Canvas Math Challenge -->
     <div class="captcha-wrapper">
@@ -125,7 +129,15 @@
         <div id="mcaptcha__widget-container"></div>
     </div>
 
-    <!-- 3. hCaptcha Box -->
+    <!-- 3. Friendly Captcha Box -->
+    <div class="captcha-wrapper">
+        <div class="frc-captcha" 
+             data-sitekey="FCMPIBVD0T9CPL74" 
+             data-callback="onFriendlyCaptchaVerified">
+        </div>
+    </div>
+
+    <!-- 4. hCaptcha Box -->
     <div class="captcha-wrapper">
         <div class="h-captcha" 
              data-sitekey="0434871e-cc70-4460-bbb4-00e6bc7204fa" 
@@ -143,6 +155,7 @@
 <script>
     let mcaptchaToken = "";
     let hcaptchaToken = "";
+    let friendlyToken = "";
     let canvasVerified = false;
     let secureTargetValue = null;
 
@@ -226,33 +239,39 @@
         }
     }, 300);
 
-    // --- 3. hCaptcha Callback ---
+    // --- 3. Friendly Captcha Callback ---
+    function onFriendlyCaptchaVerified(solution) {
+        friendlyToken = solution;
+        evaluateAccessRules();
+    }
+
+    // --- 4. hCaptcha Callback ---
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
-    // --- 4. Central Evaluator ---
+    // --- 5. Central Evaluator ---
     function evaluateAccessRules() {
         const statusMsg = document.getElementById("statusMsg");
         const entryBtn = document.getElementById("entryBtn");
 
-        const completedCount = [canvasVerified, !!mcaptchaToken, !!hcaptchaToken].filter(Boolean).length;
+        const completedCount = [canvasVerified, !!mcaptchaToken, !!friendlyToken, !!hcaptchaToken].filter(Boolean).length;
 
-        if (completedCount === 3) {
+        if (completedCount === 4) {
             statusMsg.innerText = "All security challenges passed ✓";
             statusMsg.style.color = "#10b981";
             entryBtn.style.display = "block";
         } else {
             entryBtn.style.display = "none";
-            statusMsg.innerText = `Progress: ${completedCount}/3 challenges completed.`;
+            statusMsg.innerText = `Progress: ${completedCount}/4 challenges completed.`;
             statusMsg.style.color = "#9ca3af";
         }
     }
 
     function forwardUser() {
         const targetUrl = "https://hindhokla-os.netlify.app/";
-        window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}&math_v=passed`;
+        window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}&f_token=${encodeURIComponent(friendlyToken)}&math_v=passed`;
     }
 
     // Initialize Canvas on Load
