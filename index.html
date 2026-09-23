@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Gateway - Verification Required</title>
     
-    <!-- Load hCaptcha Script -->
+    <!-- Load hCaptcha Integration Script -->
     <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
 
     <style>
@@ -16,7 +16,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
         }
         .gateway-box {
@@ -30,9 +30,10 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
         .captcha-wrapper {
-            margin: 25px 0;
+            margin: 20px 0;
             display: flex;
             justify-content: center;
+            min-height: 80px;
         }
         .btn-proceed {
             background-color: #dc2626;
@@ -51,13 +52,19 @@
             transition: background-color 0.2s;
         }
         .btn-proceed:hover { background-color: #b91c1c; }
-        .status-msg { color: #9ca3af; font-size: 13px; margin-bottom: 20px; }
+        .status-msg { 
+            color: #9ca3af; 
+            font-size: 13px; 
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
         h1 { color: #f3f4f6; font-size: 24px; margin-bottom: 5px; letter-spacing: -0.5px; }
+        
         iframe.mcaptcha-frame {
             border: none;
             width: 300px;
-            height: 78px;
-            overflow: hidden;
+            height: 80px;
+            background: transparent;
         }
     </style>
 </head>
@@ -65,19 +72,19 @@
 
 <div class="gateway-box">
     <h1>SECURITY CLEARANCE</h1>
-    <p class="status-msg">Compute verification and manual verification required to pass.</p>
+    <p id="statusMsg" class="status-msg">Please complete both verification challenges below.</p>
 
-    <!-- 1. Native mCaptcha Frame -->
+    <!-- 1. Direct mCaptcha Iframe Integration -->
     <div class="captcha-wrapper">
         <iframe 
             class="mcaptcha-frame"
             id="mcaptcha-iframe"
             src="https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx"
-            title="mCaptcha Verification">
+            title="mCaptcha Proof-of-Work Challenge">
         </iframe>
     </div>
 
-    <!-- 2. hCaptcha Box -->
+    <!-- 2. hCaptcha Integration -->
     <div class="captcha-wrapper">
         <div class="h-captcha" 
              data-sitekey="0434871e-cc70-4460-bbb4-00e6bc7204fa" 
@@ -85,7 +92,7 @@
         </div>
     </div>
 
-    <!-- Proceed Button -->
+    <!-- Entry Execution Link -->
     <button id="entryBtn" class="btn-proceed" onclick="forwardUser()">Access Approved: Enter Site</button>
 </div>
 
@@ -93,45 +100,49 @@
     let mcaptchaToken = "";
     let hcaptchaToken = "";
 
-    // Listen for mCaptcha token broadcasted via cross-document postMessage
+    // Universal message listener for mCaptcha token broadcast
     window.addEventListener('message', (event) => {
-        // Validate origin matches the instance domain
-        if (event.origin === "https://mcaptcha.org") {
-            try {
-                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-                
-                // Read verification token from postMessage payload
-                if (data && (data.token || data.mcaptcha_token)) {
-                    mcaptchaToken = data.token || data.mcaptcha_token;
-                    evaluateAccessRules();
-                }
-            } catch (err) {
-                // Ignore irrelevant messages
+        let data = event.data;
+        
+        // Parse JSON string payload if needed
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch (e) {}
+        }
+
+        // Intercept token from mCaptcha iframe response
+        if (data && typeof data === 'object') {
+            const token = data.token || data.mcaptcha_token || data.verification_token;
+            if (token && !mcaptchaToken) {
+                mcaptchaToken = token;
+                evaluateAccessRules();
             }
         }
     });
 
-    // Callback fired when hCaptcha completes
+    // Callback fired when hCaptcha is visually solved
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
-    // Show button only when both verification checks pass
+    // Evaluate token state and update live UI status
     function evaluateAccessRules() {
-        if (mcaptchaToken && hcaptchaToken) {
-            const entryBtn = document.getElementById("entryBtn");
-            const statusMsg = document.querySelector(".status-msg");
-            
-            if (entryBtn) entryBtn.style.display = "block";
-            if (statusMsg) {
-                statusMsg.innerText = "All security challenges passed.";
-                statusMsg.style.color = "#10b981";
-            }
+        const statusMsg = document.getElementById("statusMsg");
+        const entryBtn = document.getElementById("entryBtn");
+
+        if (mcaptchaToken && !hcaptchaToken) {
+            statusMsg.innerText = "mCaptcha verified ✓. Please complete hCaptcha.";
+            statusMsg.style.color = "#3b82f6";
+        } else if (!mcaptchaToken && hcaptchaToken) {
+            statusMsg.innerText = "hCaptcha verified ✓. Please complete mCaptcha.";
+            statusMsg.style.color = "#3b82f6";
+        } else if (mcaptchaToken && hcaptchaToken) {
+            statusMsg.innerText = "All security challenges passed ✓";
+            statusMsg.style.color = "#10b981";
+            entryBtn.style.display = "block";
         }
     }
 
-    // Redirect to destination URL carrying both tokens as parameters
     function forwardUser() {
         const targetUrl = "https://hindhokla-os.netlify.app/";
         window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}`;
