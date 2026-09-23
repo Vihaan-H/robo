@@ -59,12 +59,10 @@
             line-height: 1.5;
         }
         h1 { color: #f3f4f6; font-size: 24px; margin-bottom: 5px; letter-spacing: -0.5px; }
-        
-        iframe.mcaptcha-frame {
-            border: none;
-            width: 300px;
-            height: 80px;
-            background: transparent;
+
+        /* Hide the mCaptcha authorization token input field */
+        #mcaptcha__token-label {
+            display: none;
         }
     </style>
 </head>
@@ -74,17 +72,18 @@
     <h1>SECURITY CLEARANCE</h1>
     <p id="statusMsg" class="status-msg">Please complete both verification challenges below.</p>
 
-    <!-- 1. Direct mCaptcha Iframe Integration -->
+    <!-- 1. mCaptcha Form Elements (Per Official Docs) -->
     <div class="captcha-wrapper">
-        <iframe 
-            class="mcaptcha-frame"
-            id="mcaptcha-iframe"
-            src="https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx"
-            title="mCaptcha Proof-of-Work Challenge">
-        </iframe>
+        <label 
+            data-mcaptcha_url="https://demo.mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx" 
+            for="mcaptcha__token" 
+            id="mcaptcha__token-label">
+            <input type="text" name="mcaptcha__token" id="mcaptcha__token" />
+        </label>
+        <div id="mcaptcha__widget-container"></div>
     </div>
 
-    <!-- 2. hCaptcha Integration -->
+    <!-- 2. hCaptcha Box -->
     <div class="captcha-wrapper">
         <div class="h-captcha" 
              data-sitekey="0434871e-cc70-4460-bbb4-00e6bc7204fa" 
@@ -92,40 +91,33 @@
         </div>
     </div>
 
-    <!-- Entry Execution Link -->
+    <!-- Proceed Button -->
     <button id="entryBtn" class="btn-proceed" onclick="forwardUser()">Access Approved: Enter Site</button>
 </div>
+
+<!-- Load mCaptcha Vanilla Glue Script at end of body -->
+<script src="https://unpkg.com/@mcaptcha/vanilla-glue@0.1.0-rc2/dist/index.js"></script>
 
 <script>
     let mcaptchaToken = "";
     let hcaptchaToken = "";
 
-    // Universal message listener for mCaptcha token broadcast
-    window.addEventListener('message', (event) => {
-        let data = event.data;
-        
-        // Parse JSON string payload if needed
-        if (typeof data === 'string') {
-            try { data = JSON.parse(data); } catch (e) {}
+    // Monitor mCaptcha token generation automatically
+    setInterval(() => {
+        const tokenInput = document.getElementById("mcaptcha__token");
+        if (tokenInput && tokenInput.value && !mcaptchaToken) {
+            mcaptchaToken = tokenInput.value;
+            evaluateAccessRules();
         }
+    }, 300);
 
-        // Intercept token from mCaptcha iframe response
-        if (data && typeof data === 'object') {
-            const token = data.token || data.mcaptcha_token || data.verification_token;
-            if (token && !mcaptchaToken) {
-                mcaptchaToken = token;
-                evaluateAccessRules();
-            }
-        }
-    });
-
-    // Callback fired when hCaptcha is visually solved
+    // Callback fired when hCaptcha completes
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
-    // Evaluate token state and update live UI status
+    // Evaluate token presence and reveal entry button
     function evaluateAccessRules() {
         const statusMsg = document.getElementById("statusMsg");
         const entryBtn = document.getElementById("entryBtn");
