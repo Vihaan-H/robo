@@ -7,9 +7,6 @@
     
     <!-- Load hCaptcha Script -->
     <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
-    
-    <!-- Load mCaptcha Vanilla Glue Script -->
-    <script src="https://unpkg.com/@mcaptcha/vanilla-glue@latest/dist/index.js"></script>
 
     <style>
         body {
@@ -56,6 +53,12 @@
         .btn-proceed:hover { background-color: #b91c1c; }
         .status-msg { color: #9ca3af; font-size: 13px; margin-bottom: 20px; }
         h1 { color: #f3f4f6; font-size: 24px; margin-bottom: 5px; letter-spacing: -0.5px; }
+        iframe.mcaptcha-frame {
+            border: none;
+            width: 300px;
+            height: 78px;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -64,9 +67,14 @@
     <h1>SECURITY CLEARANCE</h1>
     <p class="status-msg">Compute verification and manual verification required to pass.</p>
 
-    <!-- 1. mCaptcha Box (Container required by mCaptcha) -->
+    <!-- 1. Native mCaptcha Frame -->
     <div class="captcha-wrapper">
-        <div id="mcaptcha__widget-container"></div>
+        <iframe 
+            class="mcaptcha-frame"
+            id="mcaptcha-iframe"
+            src="https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx"
+            title="mCaptcha Verification">
+        </iframe>
     </div>
 
     <!-- 2. hCaptcha Box -->
@@ -77,7 +85,7 @@
         </div>
     </div>
 
-    <!-- Entry Execution Link -->
+    <!-- Proceed Button -->
     <button id="entryBtn" class="btn-proceed" onclick="forwardUser()">Access Approved: Enter Site</button>
 </div>
 
@@ -85,42 +93,31 @@
     let mcaptchaToken = "";
     let hcaptchaToken = "";
 
-    // Function to safely initialize mCaptcha once the library is loaded
-    function initMCaptcha() {
-        if (typeof mcaptchaGlue !== 'undefined') {
+    // Listen for mCaptcha token broadcasted via cross-document postMessage
+    window.addEventListener('message', (event) => {
+        // Validate origin matches the instance domain
+        if (event.origin === "https://mcaptcha.org") {
             try {
-                new mcaptchaGlue.Widget({
-                    widgetLink: new URL("https://mcaptcha.org/widget/?sitekey=tyBV0DQvnaMsiio8cKtCTKf1oT3F1ELx")
-                });
+                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                
+                // Read verification token from postMessage payload
+                if (data && (data.token || data.mcaptcha_token)) {
+                    mcaptchaToken = data.token || data.mcaptcha_token;
+                    evaluateAccessRules();
+                }
             } catch (err) {
-                console.error("mCaptcha initialization failed:", err);
+                // Ignore irrelevant messages
             }
-        } else {
-            // Retry after 100ms if script is still downloading
-            setTimeout(initMCaptcha, 100);
         }
-    }
-
-    // Start initialization when page loads
-    window.addEventListener('load', () => {
-        initMCaptcha();
-
-        // Check continuously for the token input created by mCaptcha
-        setInterval(() => {
-            const tokenInput = document.getElementById("mcaptcha__token");
-            if (tokenInput && tokenInput.value && !mcaptchaToken) {
-                mcaptchaToken = tokenInput.value;
-                evaluateAccessRules();
-            }
-        }, 300);
     });
 
-    // Callback for hCaptcha completion
+    // Callback fired when hCaptcha completes
     function onHCaptchaVerified(token) {
         hcaptchaToken = token;
         evaluateAccessRules();
     }
 
+    // Show button only when both verification checks pass
     function evaluateAccessRules() {
         if (mcaptchaToken && hcaptchaToken) {
             const entryBtn = document.getElementById("entryBtn");
@@ -134,6 +131,7 @@
         }
     }
 
+    // Redirect to destination URL carrying both tokens as parameters
     function forwardUser() {
         const targetUrl = "https://hindhokla-os.netlify.app/";
         window.location.href = `${targetUrl}?m_token=${encodeURIComponent(mcaptchaToken)}&h_token=${encodeURIComponent(hcaptchaToken)}`;
